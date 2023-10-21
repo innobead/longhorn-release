@@ -1,0 +1,38 @@
+name: Tag
+
+on:
+  push:
+    tags:
+    - 'v*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - uses: nowsprinting/check-version-format-action@v3
+      with:
+        prefix: 'v'
+
+    - uses: actions/checkout@v4
+    - uses: extractions/setup-just@v1
+    - uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: true
+        tags: |
+          ghcr.io/${{ github.repository }}:latest
+          ghcr.io/${{ github.repository }}:${{ github.ref_name }}

@@ -2,17 +2,22 @@
 name = "longhorn-release"
 version = "0.1.0"
 edition = "2021"
-description = "CLI for Longhorn release tasks"
+description = "CLI for Longhorn Release Tasks"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 clap = { version = "4.3.21", features = ["derive"] }
-anyhow = { version = "1.0.75", features = [] }
-which = { version = "4.4.2", features = [] }
-maplit = { version = "1.0.2", features = [] }
-tracing-subscriber = { version = "0.3.17", features = [] }
-tracing-log = { version = "0.1.3", features = [] }
-tracing = "0.1.39"
-regex = { version = "1.10.1", features = [] }
-lazy_static = { version = "1.4.0", features = [] }
+anyhow = { version = "1.0.75" }
+which = { version = "5.0.0" }
+maplit = { version = "1.0.2" }
+tracing-subscriber = { version = "0.3.17" }
+tracing-log = { version = "0.1.3" }
+tracing = { version = "0.1.39" }
+regex = { version = "1.10.1" }
+lazy_static = { version = "1.4.0" }
+
+[profile.release]
+strip = true
+opt-level = "z"
+lto = true

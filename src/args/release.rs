@@ -7,7 +7,11 @@ use crate::Cli;
 pub struct ReleaseArgs {}
 
 impl CliCommand for ReleaseArgs {
-    fn run(&self, _cli: &Cli) -> anyhow::Result<()> {
+    fn run(&self, _: &Cli) -> anyhow::Result<()> {
+        //TODO
+        // 1. Create a draft release with a release note
+        // 2. Create a release note PR
+
         todo!()
     }
 }

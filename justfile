@@ -1,11 +1,16 @@
 fix:
     cargo clippy --fix --allow-dirty --allow-staged
 
-build:
+fmt:
     cargo fmt --all
+
+build: fix fmt
     cargo build
 
-test:
+release: fix fmt
+    cargo build --release
+
+test: build
     cargo test
 
 clean:

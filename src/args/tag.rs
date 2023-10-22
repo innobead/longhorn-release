@@ -4,23 +4,31 @@ use std::io::Write;
 use std::path::PathBuf;
 
 use anyhow::anyhow;
+use async_trait::async_trait;
 use clap::Args;
 use tracing_log::log;
 
 use crate::args::CliCommand;
-use crate::common::RELEASE_DIR_PATH;
+use crate::common::working_dir_path;
 use crate::{cmd, cmd_ignore_err, common, Cli};
 
 #[derive(Args)]
+#[command(about = "Create a tag to owner's repos for a release")]
 pub struct TagArgs {
-    #[arg(short, long)]
+    #[arg(short, long, help = "Branch name")]
     branch: String,
 
-    #[arg(short, long)]
+    #[arg(short, long, help = "Tag")]
     tag: String,
 
-    #[arg(short, long, default_value = "longhorn", hide = true)]
-    group: Option<String>,
+    #[arg(
+        short,
+        long,
+        default_value = "longhorn",
+        hide = true,
+        help = "GitHub Owner"
+    )]
+    owner: String,
 
     #[arg(short,
     long,
@@ -32,28 +40,32 @@ pub struct TagArgs {
     "longhorn-share-manager",
     "backing-image-manager",
     ],
-    hide = true)]
-    repos: Option<Vec<String>>,
+    hide = true,
+    help = "GitHub Repos to tag")]
+    repos: Vec<String>,
 
-    #[arg(short, long)]
+    #[arg(short, long, help = "Git commit message")]
     message: Option<String>,
 
-    #[arg(short, long, default_value = "false")]
+    #[arg(
+        short,
+        long,
+        default_value = "false",
+        help = "Force to delete the existing tag"
+    )]
     force: bool,
 }
 
+#[async_trait]
 impl CliCommand for TagArgs {
-    fn run(&self, _: &Cli) -> anyhow::Result<()> {
-        let group = self.group.as_ref().expect("required");
-        let repos = self.repos.as_ref().expect("required");
+    async fn run(&self, _: &Cli) -> anyhow::Result<()> {
+        for repo in &self.repos {
+            let repo_path = format!("{}/{}", self.owner, repo);
+            let repo_dir_path = working_dir_path().join(repo);
 
-        for repo in repos {
-            let repo_path = format!("{}/{}", group, repo);
-            let repo_dir_path = RELEASE_DIR_PATH.join(repo);
+            common::clone_repo(&repo_path, &self.branch, &repo_dir_path, working_dir_path())?;
 
-            common::clone_repo(&repo_path, &self.branch, &repo_dir_path, &RELEASE_DIR_PATH)?;
-
-            self.delete_existing_tag(&repo_path, &repo_dir_path)?;
+            self.delete_tag(&repo_path, &repo_dir_path)?;
             self.create_tag(&repo_path, &repo_dir_path)?;
         }
 
@@ -92,7 +104,7 @@ impl TagArgs {
         Ok(())
     }
 
-    fn delete_existing_tag(&self, repo_path: &str, repo_dir_path: &PathBuf) -> anyhow::Result<()> {
+    fn delete_tag(&self, repo_path: &str, repo_dir_path: &PathBuf) -> anyhow::Result<()> {
         log::info!("Checking if tag {repo_path}/{} exists", self.tag);
 
         cmd_ignore_err!(

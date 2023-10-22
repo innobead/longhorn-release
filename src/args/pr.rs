@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -9,11 +10,11 @@ use regex::Regex;
 use tracing_log::log;
 
 use crate::args::CliCommand;
-use crate::common::RELEASE_DIR_PATH;
+use crate::common::working_dir_path;
 use crate::{cmd, cmd_ignore_err, common, Cli};
 
 lazy_static! {
-    static ref MANIFEST_VERSION_REG_PATTERNS: HashMap<&'static str, Vec<&'static str>> = hashmap! {
+    static ref VERSION_MANIFEST_PATTERNS: HashMap<&'static str, Vec<&'static str>> = hashmap! {
         "chart/Chart.yaml" => vec![
             r"(version: )(\S+)",
             r"(appVersion: v?)(\S+)"
@@ -31,20 +32,42 @@ lazy_static! {
 }
 
 #[derive(Args)]
+#[command(about = "Create PRs for a release")]
 pub struct PrArgs {
-    #[arg(short, long)]
+    #[arg(short, long, help = "Branch name")]
     branch: String,
 
-    #[arg(short, long)]
+    #[arg(short, long, help = "Tag")]
     tag: String,
 
-    #[arg(short, long, default_value = "longhorn", hide = true)]
-    group: Option<String>,
+    #[arg(
+        short,
+        long,
+        default_value = "longhorn",
+        hide = true,
+        help = "GitHub Owner"
+    )]
+    owner: String,
 
-    #[arg(short, long, default_value = "longhorn", hide = true)]
-    repo: Option<String>,
+    #[arg(
+        short,
+        long,
+        default_value = "longhorn",
+        hide = true,
+        help = "GitHub Repo for release"
+    )]
+    repo: String,
 
-    #[arg(short, long)]
+    #[arg(
+        short,
+        long,
+        default_value = "charts",
+        hide = true,
+        help = "Github Repo for helm chart"
+    )]
+    chart_repo: String,
+
+    #[arg(short, long, help = "Git commit message")]
     message: Option<String>,
 
     #[arg(long,
@@ -56,42 +79,50 @@ pub struct PrArgs {
     "longhorn-share-manager",
     "backing-image-manager",
     ],
-    hide = true)]
-    components: Option<Vec<String>>,
+    hide = true,
+    help = "Components to update")]
+    components: Vec<String>,
 }
 
+#[async_trait]
 impl CliCommand for PrArgs {
-    fn run(&self, _: &Cli) -> anyhow::Result<()> {
-        let group = self.group.as_ref().expect("required");
-        let repo = self.repo.as_ref().expect("required");
-        let components = self.components.as_ref().expect("required");
+    async fn run(&self, _: &Cli) -> anyhow::Result<()> {
+        let repo_path = format!("{}/{}", self.owner, self.repo);
+        let repo_dir_path = working_dir_path().join(&self.repo);
+        let chart_repo_dir_path = working_dir_path().join(&self.chart_repo);
 
-        let repo_path = format!("{}/{}", group, repo);
-        let repo_dir_path = RELEASE_DIR_PATH.join(repo);
-
-        common::clone_repo(&repo_path, &self.branch, &repo_dir_path, &RELEASE_DIR_PATH)?;
-
-        update_manifests(&repo_dir_path, &self.tag, components)?;
-        update_deploy_manifest(&repo_dir_path)?;
-        create_prs(
-            &repo_dir_path,
-            &self.message.clone().unwrap_or_default(),
-            &self.tag,
+        common::clone_repo(&repo_path, &self.branch, &repo_dir_path, working_dir_path())?;
+        common::clone_repo(
+            &repo_path,
             &self.branch,
+            &chart_repo_dir_path,
+            working_dir_path(),
         )?;
+
+        update_version_manifests(&repo_dir_path, &self.tag, &self.components)?;
+        update_deploy_manifest(&repo_dir_path, &chart_repo_dir_path)?;
+
+        for p in [&repo_dir_path, &chart_repo_dir_path] {
+            create_pr(
+                p,
+                &self.message.clone().unwrap_or_default(),
+                &self.tag,
+                &self.branch,
+            )?;
+        }
 
         Ok(())
     }
 }
 
-fn update_manifests(
+fn update_version_manifests(
     repo_dir_path: &Path,
     version: &str,
     components: &[String],
 ) -> anyhow::Result<()> {
     log::info!("Updating manifests");
 
-    for (f, reg_pats) in MANIFEST_VERSION_REG_PATTERNS.iter() {
+    for (f, reg_pats) in VERSION_MANIFEST_PATTERNS.iter() {
         let mut new_version = version.clone();
 
         // A workaround for chart.yaml
@@ -141,17 +172,38 @@ fn replace_str_with_version_by_reg(
     Ok(())
 }
 
-fn update_deploy_manifest(repo_dir_path: &PathBuf) -> anyhow::Result<()> {
+fn update_deploy_manifest(
+    repo_dir_path: &PathBuf,
+    chart_repo_dir_path: &PathBuf,
+) -> anyhow::Result<()> {
+    log::info!("Updating deploy manifest in {:?}", repo_dir_path);
     cmd!(
         "scripts/generate-longhorn-yaml.sh",
         &repo_dir_path,
         [] as [&str; 0]
     );
 
+    log::info!(
+        "Updating chart {:?} from {:?}",
+        chart_repo_dir_path,
+        repo_dir_path
+    );
+
+    let chart_dir = chart_repo_dir_path.join("charts").join("longhorn");
+    fs_extra::dir::remove(&chart_dir)?;
+
+    fs_extra::dir::copy(
+        repo_dir_path.join("chart"),
+        chart_dir,
+        &fs_extra::dir::CopyOptions::new(),
+    )?;
+
     Ok(())
 }
 
-fn create_prs(repo_dir_path: &PathBuf, msg: &str, tag: &str, branch: &str) -> anyhow::Result<()> {
+fn create_pr(repo_dir_path: &PathBuf, msg: &str, tag: &str, branch: &str) -> anyhow::Result<()> {
+    log::info!("Creating PR for tag {}, branch {}", tag, branch);
+
     let msg = if msg.is_empty() {
         format!("release: {}", tag)
     } else {
@@ -159,18 +211,21 @@ fn create_prs(repo_dir_path: &PathBuf, msg: &str, tag: &str, branch: &str) -> an
     };
     let fork_branch = format!("pr-{}", tag);
 
-    log::info!("Creating PRs for {}", tag);
-
     cmd_ignore_err!("git", &repo_dir_path, ["branch", "-D", &fork_branch]);
 
     for args in [
         vec!["checkout", "-b", &fork_branch],
         vec!["commit", "-am", &msg, "-s"],
         vec!["push", "-u", "--force", "origin", &fork_branch],
-        vec!["pr", "create", "-B", branch, "-f", "-t", &msg],
     ] {
         cmd!("git", &repo_dir_path, args);
     }
+
+    cmd!(
+        "gh",
+        &repo_dir_path,
+        ["pr", "create", "-B", branch, "-f", "-t", &msg]
+    );
 
     Ok(())
 }

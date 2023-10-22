@@ -1,16 +1,11 @@
-use std::env;
 use std::path::PathBuf;
 use std::str::FromStr;
 
 use anyhow::anyhow;
-use lazy_static::lazy_static;
+use octocrab::Octocrab;
 use tracing_log::{log, LogTracer};
 
 use crate::{cmd, cmd_ignore_err};
-
-lazy_static! {
-    pub static ref RELEASE_DIR_PATH: PathBuf = env::current_dir().unwrap().join(".release");
-}
 
 pub fn enable_logging(level: &str) -> anyhow::Result<()> {
     LogTracer::init()?;
@@ -38,7 +33,7 @@ pub fn clone_repo(
     repo_path: &str,
     branch: &str,
     repo_dir_path: &PathBuf,
-    rel_dir_path: &PathBuf,
+    working_dir_path: &PathBuf,
 ) -> anyhow::Result<()> {
     if repo_dir_path.exists() {
         log::info!("Fetching repo {repo_path} and reset to branch {branch}");
@@ -55,10 +50,18 @@ pub fn clone_repo(
 
         cmd_ignore_err!(
             "gh",
-            &rel_dir_path,
+            &working_dir_path,
             ["repo", "clone", repo_path, "--", "--branch", branch]
         );
     }
 
     Ok(())
+}
+
+pub fn working_dir_path<'a>() -> &'a PathBuf {
+    &crate::global::RELEASE_DIR_PATH
+}
+
+pub fn github_client<'a>() -> &'a Octocrab {
+    crate::global::GITHUB_CLIENT.get().unwrap()
 }

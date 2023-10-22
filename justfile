@@ -16,3 +16,7 @@ test: build
 clean:
     cargo clean
     rm -rf ./.release
+
+udeps:
+    cargo install cargo-udeps --locked
+    cargo +nightly udeps

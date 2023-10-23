@@ -4,10 +4,11 @@ use anyhow::anyhow;
 use clap::{Parser, Subcommand};
 use octocrab::OctocrabBuilder;
 
+use crate::args::changelog::ChangelogArgs;
+use crate::args::CliCommand;
 use crate::args::pr::PrArgs;
 use crate::args::release::ReleaseArgs;
 use crate::args::tag::TagArgs;
-use crate::args::CliCommand;
 use crate::common::working_dir_path;
 use crate::global::GITHUB_CLIENT;
 
@@ -36,9 +37,10 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    Tag(TagArgs),
+    Changelog(ChangelogArgs),
     Pr(PrArgs),
     Release(ReleaseArgs),
+    Tag(TagArgs),
 }
 
 fn init(cli: &Cli) -> anyhow::Result<()> {
@@ -51,9 +53,7 @@ fn init(cli: &Cli) -> anyhow::Result<()> {
         return Err(anyhow!("Github Token is required"));
     }
 
-    let octocrab = OctocrabBuilder::default()
-        .personal_token(cli.github_token.clone().unwrap())
-        .build()?;
+    let octocrab = OctocrabBuilder::default().personal_token(cli.github_token.clone().unwrap()).build()?;
     if GITHUB_CLIENT.set(octocrab).is_err() {
         return Err(anyhow!("GitHub client has been initialized"));
     }
@@ -67,8 +67,9 @@ async fn main() -> anyhow::Result<()> {
     init(&cli)?;
 
     match &cli.command {
-        Commands::Tag(args) => args.run(&cli).await,
+        Commands::Changelog(args) => args.run(&cli).await,
         Commands::Pr(args) => args.run(&cli).await,
         Commands::Release(args) => args.run(&cli).await,
+        Commands::Tag(args) => args.run(&cli).await,
     }
 }

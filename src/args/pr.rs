@@ -1,17 +1,17 @@
-use async_trait::async_trait;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use async_trait::async_trait;
 use clap::Args;
 use lazy_static::lazy_static;
 use maplit::hashmap;
 use regex::Regex;
 use tracing_log::log;
 
+use crate::{Cli, cmd, cmd_ignore_err, common};
 use crate::args::CliCommand;
 use crate::common::working_dir_path;
-use crate::{cmd, cmd_ignore_err, common, Cli};
 
 lazy_static! {
     static ref VERSION_MANIFEST_PATTERNS: HashMap<&'static str, Vec<&'static str>> = hashmap! {
@@ -26,7 +26,7 @@ lazy_static! {
             r"(repository: longhornio\/(longhorn|backing)[\s\S]*?tag:\s+)(\S+)"
         ],
         "uninstall/uninstall.yaml" => vec![
-            r"(image: longhornio/\S+:v?)(\S+)"
+            r"(image: longhornio/\S+:)(\S+)"
         ]
     };
 }
@@ -40,31 +40,25 @@ pub struct PrArgs {
     #[arg(short, long, help = "Tag")]
     tag: String,
 
-    #[arg(
-        short,
-        long,
-        default_value = "longhorn",
-        hide = true,
-        help = "GitHub Owner"
-    )]
+    #[arg(short,
+    long,
+    default_value = "longhorn",
+    hide = true,
+    help = "GitHub Owner")]
     owner: String,
 
-    #[arg(
-        short,
-        long,
-        default_value = "longhorn",
-        hide = true,
-        help = "GitHub Repo for release"
-    )]
+    #[arg(short,
+    long,
+    default_value = "longhorn",
+    hide = true,
+    help = "GitHub Repo for release")]
     repo: String,
 
-    #[arg(
-        short,
-        long,
-        default_value = "charts",
-        hide = true,
-        help = "Github Repo for helm chart"
-    )]
+    #[arg(short,
+    long,
+    default_value = "charts",
+    hide = true,
+    help = "Github Repo for helm chart")]
     chart_repo: String,
 
     #[arg(short, long, help = "Git commit message")]
@@ -88,12 +82,18 @@ pub struct PrArgs {
 impl CliCommand for PrArgs {
     async fn run(&self, _: &Cli) -> anyhow::Result<()> {
         let repo_path = format!("{}/{}", self.owner, self.repo);
+        let chart_repo_path = format!("{}/{}", self.owner, self.chart_repo);
         let repo_dir_path = working_dir_path().join(&self.repo);
         let chart_repo_dir_path = working_dir_path().join(&self.chart_repo);
 
-        common::clone_repo(&repo_path, &self.branch, &repo_dir_path, working_dir_path())?;
         common::clone_repo(
             &repo_path,
+            &self.branch,
+            &repo_dir_path,
+            working_dir_path(),
+        )?;
+        common::clone_repo(
+            &chart_repo_path,
             &self.branch,
             &chart_repo_dir_path,
             working_dir_path(),
@@ -191,11 +191,12 @@ fn update_deploy_manifest(
 
     let chart_dir = chart_repo_dir_path.join("charts").join("longhorn");
     fs_extra::dir::remove(&chart_dir)?;
+    fs::create_dir_all(&chart_dir)?;
 
     fs_extra::dir::copy(
         repo_dir_path.join("chart"),
         chart_dir,
-        &fs_extra::dir::CopyOptions::new(),
+        &fs_extra::dir::CopyOptions::new().content_only(true),
     )?;
 
     Ok(())

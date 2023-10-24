@@ -5,10 +5,10 @@ use clap::{Parser, Subcommand};
 use octocrab::OctocrabBuilder;
 
 use crate::args::changelog::ChangelogArgs;
-use crate::args::CliCommand;
 use crate::args::pr::PrArgs;
 use crate::args::release::ReleaseArgs;
 use crate::args::tag::TagArgs;
+use crate::args::CliCommand;
 use crate::common::working_dir_path;
 use crate::global::GITHUB_CLIENT;
 
@@ -26,7 +26,7 @@ pub struct Cli {
     #[arg(global = true,
     short,
     long,
-    default_value = "info",
+    default_value = "error",
     value_parser = ["error", "warn", "info", "debug", "trace"],
     help = "Log level")]
     log_level: String,
@@ -53,7 +53,9 @@ fn init(cli: &Cli) -> anyhow::Result<()> {
         return Err(anyhow!("Github Token is required"));
     }
 
-    let octocrab = OctocrabBuilder::default().personal_token(cli.github_token.clone().unwrap()).build()?;
+    let octocrab = OctocrabBuilder::default()
+        .personal_token(cli.github_token.clone().unwrap())
+        .build()?;
     if GITHUB_CLIENT.set(octocrab).is_err() {
         return Err(anyhow!("GitHub client has been initialized"));
     }

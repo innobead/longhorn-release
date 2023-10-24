@@ -9,9 +9,9 @@ use maplit::hashmap;
 use regex::Regex;
 use tracing_log::log;
 
-use crate::{Cli, cmd, cmd_ignore_err, common};
 use crate::args::CliCommand;
 use crate::common::working_dir_path;
+use crate::{cmd, cmd_ignore_err, common, Cli};
 
 lazy_static! {
     static ref VERSION_MANIFEST_PATTERNS: HashMap<&'static str, Vec<&'static str>> = hashmap! {
@@ -40,25 +40,31 @@ pub struct PrArgs {
     #[arg(short, long, help = "Tag")]
     tag: String,
 
-    #[arg(short,
-    long,
-    default_value = "longhorn",
-    hide = true,
-    help = "GitHub Owner")]
+    #[arg(
+        short,
+        long,
+        default_value = "longhorn",
+        hide = true,
+        help = "GitHub Owner"
+    )]
     owner: String,
 
-    #[arg(short,
-    long,
-    default_value = "longhorn",
-    hide = true,
-    help = "GitHub Repo for release")]
+    #[arg(
+        short,
+        long,
+        default_value = "longhorn",
+        hide = true,
+        help = "GitHub Repo for release"
+    )]
     repo: String,
 
-    #[arg(short,
-    long,
-    default_value = "charts",
-    hide = true,
-    help = "Github Repo for helm chart")]
+    #[arg(
+        short,
+        long,
+        default_value = "charts",
+        hide = true,
+        help = "Github Repo for helm chart"
+    )]
     chart_repo: String,
 
     #[arg(short, long, help = "Git commit message")]
@@ -86,12 +92,7 @@ impl CliCommand for PrArgs {
         let repo_dir_path = working_dir_path().join(&self.repo);
         let chart_repo_dir_path = working_dir_path().join(&self.chart_repo);
 
-        common::clone_repo(
-            &repo_path,
-            &self.branch,
-            &repo_dir_path,
-            working_dir_path(),
-        )?;
+        common::clone_repo(&repo_path, &self.branch, &repo_dir_path, working_dir_path())?;
         common::clone_repo(
             &chart_repo_path,
             &self.branch,

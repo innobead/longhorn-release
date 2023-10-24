@@ -2,9 +2,9 @@ use async_trait::async_trait;
 use clap::Args;
 use indoc::formatdoc;
 
-use crate::{Cli, cmd, common};
 use crate::args::CliCommand;
 use crate::common::working_dir_path;
+use crate::{cmd, common, Cli};
 
 #[derive(Args)]
 #[command(about = "Create a Changelog for repos after a tag")]
@@ -15,11 +15,13 @@ pub struct ChangelogArgs {
     #[arg(short, long, help = "Tag")]
     tag: String,
 
-    #[arg(short,
-    long,
-    default_value = "longhorn",
-    hide = true,
-    help = "GitHub Owner")]
+    #[arg(
+        short,
+        long,
+        default_value = "longhorn",
+        hide = true,
+        help = "GitHub Owner"
+    )]
     owner: String,
 
     #[arg(short,

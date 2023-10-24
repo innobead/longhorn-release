@@ -2,10 +2,10 @@ use async_trait::async_trait;
 
 use crate::Cli;
 
+pub mod changelog;
 pub mod pr;
 pub mod release;
 pub mod tag;
-pub mod changelog;
 
 #[async_trait]
 pub trait CliCommand {

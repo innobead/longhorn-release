@@ -135,7 +135,7 @@ async fn generate_repo_report(
                                     - {} [{}]({}) {}
                                     ",
                             commit.commit.message.lines().next().unwrap(),
-                            commit.sha,
+                            &commit.sha[0..8],
                             commit.html_url,
                             commit.author.as_ref().map(|it| String::from("by @") + it.login.as_str()).unwrap_or(String::from("")),
                         };

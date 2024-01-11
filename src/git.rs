@@ -12,7 +12,12 @@ use crate::{cmd, cmd_ignore_err};
 pub trait GitOperationTrait {
     fn clone_repo(&self, branch: &str) -> anyhow::Result<()>;
 
-    fn create_tag(&self, tag: &str, message: Option<String>) -> anyhow::Result<()>;
+    fn create_tag(
+        &self,
+        tag: &str,
+        message: Option<String>,
+        version_file_created: bool,
+    ) -> anyhow::Result<()>;
 
     fn delete_tag(&self, tag: &str, force: bool) -> anyhow::Result<()>;
 
@@ -99,8 +104,13 @@ impl GitOperationTrait for GitCli {
         Ok(())
     }
 
-    fn create_tag(&self, tag: &str, message: Option<String>) -> anyhow::Result<()> {
-        if message.is_some() {
+    fn create_tag(
+        &self,
+        tag: &str,
+        message: Option<String>,
+        version_file_created: bool,
+    ) -> anyhow::Result<()> {
+        if version_file_created && message.is_some() {
             let version_file_path = PathBuf::from(self.repo.repo_ref()).join("version");
 
             log::info!(

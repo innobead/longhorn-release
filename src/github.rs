@@ -1,5 +1,6 @@
 use crate::git::GitRepo;
 use crate::{cmd, cmd_ignore_err};
+use anyhow::anyhow;
 use async_trait::async_trait;
 use octocrab::models::repos::Tag;
 use octocrab::Octocrab;
@@ -58,7 +59,7 @@ impl GithubOperationTrait for GithubCli {
             cmd!(
                 "gh",
                 &repo_dir_path,
-                ["pr", "create", "-B", branch, "-f", "-t", &msg]
+                ["pr", "create", "--base", branch, "--fill", "--title", &msg]
             )
             .stdout,
         )?;

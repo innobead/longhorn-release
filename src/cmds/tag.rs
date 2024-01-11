@@ -16,6 +16,9 @@ pub struct TagArgs {
     #[arg(long, help = "GitHub repos")]
     repos: Vec<String>,
 
+    #[arg(long, help = "GitHub repos using version file")]
+    version_file_repos: Vec<String>,
+
     #[arg(long, help = "Branch")]
     branch: String,
 
@@ -25,7 +28,7 @@ pub struct TagArgs {
     #[arg(long, help = "Commit message")]
     message: Option<String>,
 
-    #[arg(long, help = "Create a ")]
+    #[arg(long, help = "Create version file for version_file_repos")]
     create_version_file: bool,
 
     #[arg(short, long, help = "Force to delete the existing tag")]
@@ -35,7 +38,10 @@ pub struct TagArgs {
 #[async_trait]
 impl CliCommand for TagArgs {
     async fn run(&self, _: &Cli) -> anyhow::Result<()> {
-        for repo in &self.repos {
+        let mut repos = self.repos.clone();
+        repos.append(&mut self.version_file_repos.clone());
+
+        for repo in &repos {
             let git = GitCli::new(self.owner.clone(), repo.clone());
             git.clone_repo(&self.branch)?;
 
@@ -49,7 +55,11 @@ impl CliCommand for TagArgs {
                 }
             }
 
-            git.create_tag(&self.tag, self.message.clone())?;
+            git.create_tag(
+                &self.tag,
+                self.message.clone(),
+                self.version_file_repos.contains(repo) && self.create_version_file,
+            )?;
         }
 
         Ok(())

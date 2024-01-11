@@ -32,14 +32,14 @@ pub fn working_dir_path<'a>() -> &'a PathBuf {
     &crate::global::RELEASE_DIR_PATH
 }
 
-pub fn execute(script: Option<&String>, args: Option<&Vec<String>>) -> anyhow::Result<()> {
+pub fn execute(script: Option<&String>, args: Option<&Vec<String>>) -> anyhow::Result<String> {
     match script
         .as_ref()
         .map(|str| PathBuf::from(&str))
         .iter()
         .find(|p| p.is_executable())
     {
-        None => Ok(()),
+        None => Ok(String::new()),
         Some(script) => {
             log::info!("Running {:?}", script);
 
@@ -50,11 +50,14 @@ pub fn execute(script: Option<&String>, args: Option<&Vec<String>>) -> anyhow::R
             }
 
             let script = script.canonicalize()?;
-            let status = Command::new("bash").args(new_args).spawn()?.wait()?;
-            if !status.success() {
-                Err(anyhow!("failed to run {:?}: {}", script, status))
+            let output = Command::new("bash")
+                .args(new_args)
+                .spawn()?
+                .wait_with_output()?;
+            if !output.status.success() {
+                Err(anyhow!("failed to run {:?}: {}", script, output.status))
             } else {
-                Ok(())
+                Ok(String::from_utf8(output.stdout)?)
             }
         }
     }

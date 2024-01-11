@@ -87,7 +87,7 @@ impl GitOperationTrait for GitCli {
         } else {
             log::info!("Cloning repo {}", self.repo.repo_ref());
 
-            cmd_ignore_err!(
+            cmd!(
                 "gh",
                 working_dir_path(),
                 [
@@ -110,8 +110,8 @@ impl GitOperationTrait for GitCli {
         message: Option<String>,
         version_file_created: bool,
     ) -> anyhow::Result<()> {
-        if version_file_created && message.is_some() {
-            let version_file_path = PathBuf::from(self.repo.repo_ref()).join("version");
+        if version_file_created {
+            let version_file_path = self.repo.repo_dir_path().join("version");
 
             log::info!(
                 "Updating the version file {:?} with {}, and making the release commit",
@@ -120,9 +120,9 @@ impl GitOperationTrait for GitCli {
             );
 
             let mut version_file = File::create(&version_file_path)?;
-            version_file.write_all(tag.as_bytes())?;
+            version_file.write_all(format!("{tag}\n").as_bytes())?;
 
-            let msg = message.unwrap_or(format!("release: {}", tag));
+            let msg = message.unwrap_or(format!("release: update version file for {}", tag));
             cmd!(
                 "git",
                 self.repo.repo_dir_path(),

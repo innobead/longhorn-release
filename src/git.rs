@@ -1,3 +1,4 @@
+use std::fs;
 use std::fs::File;
 use std::io::{BufRead, Write};
 use std::path::PathBuf;
@@ -119,16 +120,19 @@ impl GitOperationTrait for GitCli {
                 tag
             );
 
-            let mut version_file = File::create(&version_file_path)?;
-            version_file.write_all(format!("{tag}\n").as_bytes())?;
+            if !version_file_path.exists() || !fs::read_to_string(&version_file_path)?.contains(tag)
+            {
+                let mut version_file = File::create(&version_file_path)?;
+                version_file.write_all(format!("{tag}\n").as_bytes())?;
 
-            let msg = message.unwrap_or(format!("release: update version file for {}", tag));
-            cmd!(
-                "git",
-                self.repo.repo_dir_path(),
-                ["commit", "-am", &msg, "-s"]
-            );
-            cmd!("git", self.repo.repo_dir_path(), ["push"]);
+                let msg = message.unwrap_or(format!("release: update version file for {}", tag));
+                cmd!(
+                    "git",
+                    self.repo.repo_dir_path(),
+                    ["commit", "-am", &msg, "-s"]
+                );
+                cmd!("git", self.repo.repo_dir_path(), ["push"]);
+            }
         }
 
         log::info!("Creating tag {}/{}", self.repo.repo_ref(), tag);

@@ -1,5 +1,5 @@
+use crate::cmd;
 use crate::git::GitRepo;
-use crate::{cmd};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use octocrab::models::repos::Tag;

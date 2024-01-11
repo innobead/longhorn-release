@@ -1,5 +1,5 @@
 use crate::git::GitRepo;
-use crate::{cmd, cmd_ignore_err};
+use crate::{cmd};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use octocrab::models::repos::Tag;
@@ -44,8 +44,6 @@ impl GithubOperationTrait for GithubCli {
             msg.to_string()
         };
         let fork_branch = format!("pr-{}", tag);
-
-        cmd_ignore_err!("git", &repo_dir_path, ["branch", "-D", &fork_branch]);
 
         for args in [
             vec!["checkout", "-b", &fork_branch],

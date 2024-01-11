@@ -1,5 +1,4 @@
-.data
-.renote
-.idea
-
-target
+/.data/
+/.renote/
+/.idea/
+/target/

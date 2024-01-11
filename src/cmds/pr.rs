@@ -122,24 +122,31 @@ impl CliCommand for PrArgs {
         }
 
         if !self.dryrun {
-            let mut task_joiner = tokio::task::JoinSet::new();
+            // let mut task_joiner = tokio::task::JoinSet::new();
             for (owner, repo) in changed_repos {
                 let message = self.message.clone().unwrap_or_default();
                 let tag = self.tag.clone();
                 let branch = self.branch.clone();
+                let merge = self.merge;
 
-                task_joiner.spawn(async move {
-                    let gh_client = GithubCli::new(owner, repo);
+                // task_joiner.spawn(async move {
+                let gh_client = GithubCli::new(owner, repo);
 
-                    gh_client
-                        .create_pr(&message, &tag, &branch)
-                        .and_then(|id| gh_client.merge_pr(&id))
-                });
+                gh_client
+                    .create_pr(&message, &tag, &branch)
+                    .and_then(|id| {
+                        if merge {
+                            gh_client.merge_pr(id.trim())
+                        } else {
+                            Ok(())
+                        }
+                    })?;
+                // });
             }
 
-            while let Some(res) = task_joiner.join_next().await {
-                let _ = res?;
-            }
+            // while let Some(res) = task_joiner.join_next().await {
+            //     let _ = res?;
+            // }
         }
 
         Ok(())

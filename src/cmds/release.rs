@@ -16,7 +16,7 @@ use octocrab::params::State;
 use tracing::log;
 
 use crate::cmds::CliCommand;
-use crate::common::working_dir_path;
+use crate::common::{execute, working_dir_path};
 use crate::git::{GitCli, GitOperationTrait};
 use crate::github::github_client;
 use crate::{cmd, Cli};
@@ -75,6 +75,9 @@ pub struct ReleaseArgs {
     )]
     since_days: i64,
 
+    #[arg(long, help = "Script to filter searched issues")]
+    filter_issue_hook: Option<String>,
+
     #[arg(long, help = "Files to upload to the release")]
     artifacts: Option<Vec<String>>,
 
@@ -104,16 +107,31 @@ impl CliCommand for ReleaseArgs {
             }
         }
 
-        let (mut issue_ids, issues) = self.search_issues().await?;
+        let (mut issue_ids, mut issues) = self.search_issues().await?;
 
-        let pre_note = if let Some(note) = &self.pre_note {
-            read_note_file(note)
+        if let Some(hook) = &self.filter_issue_hook {
+            log::info!("Filtering issues by hook {}", hook);
+
+            let issue_lines = execute(Some(hook), None)?;
+            for issue_id in issue_lines.lines() {
+                let issue_id = issue_id.parse::<u64>()?;
+
+                if issue_ids.remove(&issue_id) {
+                    issues.retain(|issue| issue.number != issue_id)
+                }
+            }
+        }
+
+        let pre_note = if let Some(p) = &self.pre_note {
+            log::info!("Reading pre note file: {}", p);
+            read_note_file(p)
         } else {
             String::new()
         };
 
-        let post_note = if let Some(note) = &self.post_note {
-            read_note_file(note)
+        let post_note = if let Some(p) = &self.post_note {
+            log::info!("Reading post note file: {}", p);
+            read_note_file(p)
         } else {
             String::new()
         };
@@ -139,6 +157,8 @@ fn read_note_file(path: impl Into<PathBuf>) -> String {
 
 impl ReleaseArgs {
     async fn search_issues(&self) -> anyhow::Result<(HashSet<u64>, Vec<Issue>)> {
+        log::info!("Searching issues");
+
         let labels = self.labels.clone().unwrap_or_default();
         let exclude_labels = self.exclude_labels.clone().unwrap_or_default();
 
@@ -163,10 +183,11 @@ impl ReleaseArgs {
         );
 
         let mut issues: Vec<Issue> = vec![];
-        let issue_handler = github_client().issues(&self.owner, &self.repo);
-
-        let since_date = Utc::now() - Duration::days(self.since_days);
         let mut issue_ids = hashset! {};
+
+        let issue_handler = github_client().issues(&self.owner, &self.repo);
+        let since_date = Utc::now() - Duration::days(self.since_days);
+
         for search_type in ["label", "milestone"] {
             let mut page: u32 = 1;
 
@@ -190,6 +211,12 @@ impl ReleaseArgs {
                 let mut results = builder.page(page).send().await?.items;
 
                 results.retain(|issue| {
+                    if let Some(closed_at) = issue.closed_at {
+                        if closed_at < since_date {
+                            return false;
+                        }
+                    }
+
                     !issue
                         .labels
                         .iter()
@@ -219,7 +246,7 @@ impl ReleaseArgs {
         pre_note: &String,
         post_note: &String,
     ) -> anyhow::Result<String> {
-        log::info!("Creating a draft release for {}", self.tag);
+        log::info!("Creating a release for {}", self.tag);
 
         let mut note = pre_note.clone();
         let post_note = post_note.clone();

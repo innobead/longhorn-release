@@ -90,11 +90,11 @@ async fn generate_repo_report(
     let git = GitCli::new(owner.clone(), repo.clone());
     git.clone_repo(&branch)?;
 
-    let prev_tag = if let Some(t) = prev_tag {
-        t
-    } else {
-        git.previous_tag(&tag, is_public)?
-    };
+    let mut prev_tag = prev_tag.unwrap_or_default();
+    if prev_tag.is_empty() {
+        prev_tag = git.previous_tag(&tag, is_public)?;
+    }
+
     let tag_hash = git.tag_hash(&tag)?;
     let prev_tag_hash = git.tag_hash(&prev_tag)?;
 

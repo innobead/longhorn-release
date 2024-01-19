@@ -26,6 +26,9 @@ pub struct ChangelogArgs {
     #[arg(long, help = "Tag")]
     tag: String,
 
+    #[arg(long, help = "Previous tag")]
+    prev_tag: Option<String>,
+
     #[arg(long, help = "Find previous tag automatically")]
     find_prev_tag: bool,
 
@@ -54,6 +57,7 @@ impl CliCommand for ChangelogArgs {
                 repo.clone(),
                 self.branch.clone(),
                 self.tag.clone(),
+                self.prev_tag.clone(),
                 self.find_prev_tag,
                 self.since_days,
                 self.public,
@@ -77,17 +81,26 @@ async fn generate_repo_report(
     repo: String,
     branch: String,
     tag: String,
+    prev_tag: Option<String>,
     is_find_prev_tag: bool,
-    since_days: i64,
+    mut since_days: i64,
     is_public: bool,
     is_markdown_folding: bool,
 ) -> anyhow::Result<String> {
     let git = GitCli::new(owner.clone(), repo.clone());
     git.clone_repo(&branch)?;
 
-    let prev_tag = git.previous_tag(&tag, is_public)?;
+    let prev_tag = if let Some(t) = prev_tag {
+        t
+    } else {
+        git.previous_tag(&tag, is_public)?
+    };
     let tag_hash = git.tag_hash(&tag)?;
     let prev_tag_hash = git.tag_hash(&prev_tag)?;
+    if !prev_tag_hash.is_empty() {
+        since_days = 365;
+        log::info!("Changed since_days to {since_days}, as prev_tag {prev_tag} is specified");
+    }
     let since_date = (Utc::now() - Duration::days(since_days))
         .format("%Y-%m-%dT%H:%M:%SZ")
         .to_string();
@@ -116,7 +129,7 @@ async fn generate_repo_report(
                 }
 
                 for commit in &commits {
-                    if is_find_prev_tag && !tag_found {
+                    if !tag_found {
                         if commit.sha.starts_with(&tag_hash) {
                             tag_found = true;
                         } else {
@@ -139,7 +152,6 @@ async fn generate_repo_report(
                             commit.html_url,
                             commit.author.as_ref().map(|it| String::from("by @") + it.login.as_str()).unwrap_or(String::from("")),
                         };
-                        continue;
                     }
                 }
             }

@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use chrono::{Duration, Utc};
+use chrono::{Duration, NaiveDateTime, Utc};
 use clap::Args;
 use indoc::formatdoc;
 use octocrab::models::commits::Commit;
@@ -9,7 +9,7 @@ use crate::cmds::CliCommand;
 use crate::git::{GitCli, GitOperationTrait};
 
 use crate::github::github_client;
-use crate::Cli;
+use crate::{cmd, Cli};
 
 #[derive(Args)]
 #[command(about = "Create a Changelog for repos between tags")]
@@ -83,7 +83,7 @@ async fn generate_repo_report(
     tag: String,
     prev_tag: Option<String>,
     is_find_prev_tag: bool,
-    mut since_days: i64,
+    since_days: i64,
     is_public: bool,
     is_markdown_folding: bool,
 ) -> anyhow::Result<String> {
@@ -97,13 +97,27 @@ async fn generate_repo_report(
     };
     let tag_hash = git.tag_hash(&tag)?;
     let prev_tag_hash = git.tag_hash(&prev_tag)?;
-    if !prev_tag_hash.is_empty() {
-        since_days = 365;
-        log::info!("Changed since_days to {since_days}, as prev_tag {prev_tag} is specified");
+
+    let output = cmd!(
+        "git",
+        git.repo.repo_dir_path(),
+        ["log", "-1", "--format=%at", &prev_tag]
+    );
+    let prev_tag_timestamp = String::from_utf8(output.stdout)?
+        .trim()
+        .parse::<i64>()
+        .unwrap();
+    let prev_tag_datetime =
+        NaiveDateTime::from_timestamp_opt(prev_tag_timestamp, 0).map(|it| it.and_utc());
+
+    let today = Utc::now();
+    let since_date = if let Some(it) = prev_tag_datetime {
+        it
+    } else {
+        today - Duration::days(since_days)
     }
-    let since_date = (Utc::now() - Duration::days(since_days))
-        .format("%Y-%m-%dT%H:%M:%SZ")
-        .to_string();
+    .format("%Y-%m-%dT%H:%M:%SZ")
+    .to_string();
 
     let mut changelog = String::new();
     let mut tag_found = false;

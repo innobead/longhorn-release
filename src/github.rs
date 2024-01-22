@@ -47,6 +47,7 @@ impl GithubOperationTrait for GithubCli {
 
         for args in [
             vec!["checkout", "-b", &fork_branch],
+            vec!["add", "."],
             vec!["commit", "-am", &msg, "-s"],
             vec!["push", "-u", "--force", "origin", &fork_branch],
         ] {

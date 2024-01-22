@@ -121,6 +121,7 @@ impl CliCommand for PrArgs {
             return Ok(());
         }
 
+        //TODO if nothing changed, also there is no need to create a PR
         if !self.dryrun {
             // let mut task_joiner = tokio::task::JoinSet::new();
             for (owner, repo) in changed_repos {

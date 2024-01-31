@@ -22,7 +22,7 @@ pub trait GitOperationTrait {
 
     fn delete_tag(&self, tag: &str, force: bool) -> anyhow::Result<()>;
 
-    fn tag_hash(&self, tag: &str) -> anyhow::Result<String>;
+    fn tag_hash(&self, tag: &str, branch: &str) -> anyhow::Result<String>;
     fn previous_tag(&self, tag: &str, is_public: bool) -> anyhow::Result<String>;
 }
 
@@ -177,12 +177,20 @@ impl GitOperationTrait for GitCli {
         Ok(())
     }
 
-    fn tag_hash(&self, tag: &str) -> anyhow::Result<String> {
-        let output = cmd!(
-            "git",
-            &self.repo.repo_dir_path(),
-            ["rev-parse", &format!("refs/tags/{}", tag)]
-        );
+    fn tag_hash(&self, tag: &str, branch: &str) -> anyhow::Result<String> {
+        let output = if tag.is_empty() {
+            cmd!(
+                "git",
+                &self.repo.repo_dir_path(),
+                ["rev-parse", &format!("refs/heads/{}", branch)]
+            )
+        } else {
+            cmd!(
+                "git",
+                &self.repo.repo_dir_path(),
+                ["rev-parse", &format!("refs/tags/{}", tag)]
+            )
+        };
 
         Ok(String::from_utf8(output.stdout)?.trim_end().to_string())
     }
@@ -198,7 +206,7 @@ impl GitOperationTrait for GitCli {
         let prev_tag = output.stdout.lines().find(|r| {
             let str = r.as_ref().unwrap();
 
-            if tag_found {
+            if (!tag.is_empty() && tag_found) || tag.is_empty() {
                 if is_public {
                     return semver::Version::parse(str.trim_start_matches('v'))
                         .unwrap()
@@ -216,7 +224,7 @@ impl GitOperationTrait for GitCli {
         if let Some(prev_tag) = prev_tag {
             Ok(prev_tag?)
         } else {
-            Err(anyhow!("tag not found: {}", tag))
+            Err(anyhow!("previous tag not found"))
         }
     }
 }

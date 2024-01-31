@@ -24,7 +24,7 @@ pub struct ChangelogArgs {
     branch: String,
 
     #[arg(long, help = "Tag")]
-    tag: String,
+    tag: Option<String>,
 
     #[arg(long, help = "Previous tag")]
     prev_tag: Option<String>,
@@ -56,7 +56,7 @@ impl CliCommand for ChangelogArgs {
                 self.owner.clone(),
                 repo.clone(),
                 self.branch.clone(),
-                self.tag.clone(),
+                self.tag.clone().unwrap_or_default(),
                 self.prev_tag.clone(),
                 self.find_prev_tag,
                 self.since_days,
@@ -93,10 +93,11 @@ async fn generate_repo_report(
     let mut prev_tag = prev_tag.unwrap_or_default();
     if prev_tag.is_empty() {
         prev_tag = git.previous_tag(&tag, is_public)?;
+        log::info!("Found previous tag: {prev_tag}, owner: {owner} repo: {repo} branch: {branch}")
     }
 
-    let tag_hash = git.tag_hash(&tag)?;
-    let prev_tag_hash = git.tag_hash(&prev_tag)?;
+    let tag_hash = git.tag_hash(&tag, &branch)?;
+    let prev_tag_hash = git.tag_hash(&prev_tag, &branch)?;
 
     let output = cmd!(
         "git",

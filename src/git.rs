@@ -120,7 +120,7 @@ impl GitOperationTrait for GitCli {
                 tag
             );
 
-            if !version_file_path.exists() || !fs::read_to_string(&version_file_path)?.contains(tag)
+            if !version_file_path.exists() || fs::read_to_string(&version_file_path)?.trim() != tag
             {
                 let mut version_file = File::create(&version_file_path)?;
                 version_file.write_all(format!("{tag}\n").as_bytes())?;

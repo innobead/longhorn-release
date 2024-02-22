@@ -199,7 +199,7 @@ impl GitOperationTrait for GitCli {
         let output = cmd!(
             "git",
             &self.repo.repo_dir_path(),
-            ["tag", "--sort", "-committerdate"]
+            ["tag", "--sort", "-committerdate", "--merged"]
         );
 
         let mut tag_found = false;

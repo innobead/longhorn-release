@@ -106,10 +106,13 @@ async fn generate_repo_report(
         }
     }
 
-    if !prev_tag.is_empty() {
-        let tag_hash = git.tag_hash(&tag, &branch)?;
-        let prev_tag_hash = git.tag_hash(&prev_tag, &branch)?;
+    let tag_hash = git.tag_hash(&tag, &branch)?;
+    let prev_tag_hash = git.tag_hash(&prev_tag, &branch).or_else(|err| {
+        log::debug!("Failed to get previous tag hash {:?}", err);
+        Ok(String::new())
+    })?;
 
+    if !prev_tag.is_empty() && !prev_tag_hash.is_empty() {
         let output = cmd!(
             "git",
             git.repo.repo_dir_path(),

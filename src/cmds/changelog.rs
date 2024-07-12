@@ -109,7 +109,7 @@ async fn generate_repo_report(
     let tag_hash = git.tag_hash(&tag, &branch)?;
     let prev_tag_hash = git.tag_hash(&prev_tag, &branch).or_else(|err| {
         log::debug!("Failed to get previous tag hash {:?}", err);
-        Ok(String::new())
+        anyhow::Ok(String::new())
     })?;
 
     if !prev_tag.is_empty() && !prev_tag_hash.is_empty() {

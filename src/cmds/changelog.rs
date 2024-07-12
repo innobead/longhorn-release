@@ -5,11 +5,10 @@ use indoc::formatdoc;
 use octocrab::models::commits::Commit;
 use tracing_log::log;
 
+use crate::{Cli, cmd};
 use crate::cmds::CliCommand;
 use crate::git::{GitCli, GitOperationTrait};
-
 use crate::github::github_client;
-use crate::{cmd, Cli};
 
 #[derive(Args)]
 #[command(about = "Create a Changelog for repos between tags")]
@@ -96,83 +95,87 @@ async fn generate_repo_report(
         log::info!("Found previous tag: {prev_tag}, owner: {owner} repo: {repo} branch: {branch}")
     }
 
-    let tag_hash = git.tag_hash(&tag, &branch)?;
-    let prev_tag_hash = git.tag_hash(&prev_tag, &branch)?;
-
-    let output = cmd!(
-        "git",
-        git.repo.repo_dir_path(),
-        ["log", "-1", "--format=%at", &prev_tag]
-    );
-    let prev_tag_timestamp = String::from_utf8(output.stdout)?
-        .trim()
-        .parse::<i64>()
-        .unwrap();
-    let prev_tag_datetime =
-        DateTime::from_timestamp(prev_tag_timestamp, 0);
-
-    let today = Utc::now();
-    let since_date = if let Some(it) = prev_tag_datetime {
-        it
-    } else {
-        today - Duration::days(since_days)
-    }
-    .format("%Y-%m-%dT%H:%M:%SZ")
-    .to_string();
-
     let mut changelog = String::new();
-    let mut tag_found = false;
-    let mut page = 1;
 
-    'outer: loop {
-        let result: Result<Vec<Commit>, octocrab::Error> = github_client()
-            .get(
-                format!("/repos/{}/commits", git.repo.repo_ref()),
-                Some(&[
-                    ("sha", &branch),
-                    ("page", &page.to_string()),
-                    ("since", &since_date),
-                ]),
-            )
-            .await;
-        page += 1;
+    if prev_tag.is_empty() {
+        log::info!("No previous tag found for {owner}/{repo}");
+    } else {
+        let tag_hash = git.tag_hash(&tag, &branch)?;
+        let prev_tag_hash = git.tag_hash(&prev_tag, &branch)?;
 
-        match result {
-            Ok(commits) => {
-                if commits.is_empty() {
-                    break;
-                }
+        let output = cmd!(
+            "git",
+            git.repo.repo_dir_path(),
+            ["log", "-1", "--format=%at", &prev_tag]
+        );
+        let prev_tag_timestamp = String::from_utf8(output.stdout)?
+            .trim()
+            .parse::<i64>()
+            .unwrap();
+        let prev_tag_datetime = DateTime::from_timestamp(prev_tag_timestamp, 0);
 
-                for commit in &commits {
-                    if !tag_found {
-                        if commit.sha.starts_with(&tag_hash) {
-                            tag_found = true;
-                        } else {
-                            continue;
-                        }
+        let today = Utc::now();
+        let since_date = if let Some(it) = prev_tag_datetime {
+            it
+        } else {
+            today - Duration::days(since_days)
+        }
+        .format("%Y-%m-%dT%H:%M:%SZ")
+        .to_string();
+
+        let mut tag_found = false;
+        let mut page = 1;
+
+        'outer: loop {
+            let result: Result<Vec<Commit>, octocrab::Error> = github_client()
+                .get(
+                    format!("/repos/{}/commits", git.repo.repo_ref()),
+                    Some(&[
+                        ("sha", &branch),
+                        ("page", &page.to_string()),
+                        ("since", &since_date),
+                    ]),
+                )
+                .await;
+            page += 1;
+
+            match result {
+                Ok(commits) => {
+                    if commits.is_empty() {
+                        break;
                     }
 
-                    if !is_find_prev_tag || tag_found {
-                        if tag_found {
-                            if commit.sha.starts_with(&prev_tag_hash) {
-                                break 'outer;
+                    for commit in &commits {
+                        if !tag_found {
+                            if commit.sha.starts_with(&tag_hash) {
+                                tag_found = true;
+                            } else {
+                                continue;
                             }
                         }
 
-                        changelog += &formatdoc! {"
+                        if !is_find_prev_tag || tag_found {
+                            if tag_found {
+                                if commit.sha.starts_with(&prev_tag_hash) {
+                                    break 'outer;
+                                }
+                            }
+
+                            changelog += &formatdoc! {"
                                     - {} [{}]({}) {}
                                     ",
-                            commit.commit.message.lines().next().unwrap(),
-                            &commit.sha[0..8],
-                            commit.html_url,
-                            commit.author.as_ref().map(|it| String::from("by @") + it.login.as_str()).unwrap_or(String::from("")),
-                        };
+                                commit.commit.message.lines().next().unwrap(),
+                                &commit.sha[0..8],
+                                commit.html_url,
+                                commit.author.as_ref().map(|it| String::from("by @") + it.login.as_str()).unwrap_or(String::from("")),
+                            };
+                        }
                     }
                 }
-            }
-            Err(err) => {
-                log::debug!("Failed to get commits {:?}", err);
-                break;
+                Err(err) => {
+                    log::debug!("Failed to get commits {:?}", err);
+                    break;
+                }
             }
         }
     }

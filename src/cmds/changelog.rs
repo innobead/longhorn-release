@@ -89,17 +89,24 @@ async fn generate_repo_report(
     let git = GitCli::new(owner.clone(), repo.clone());
     git.clone_repo(&branch)?;
 
+    let mut changelog = String::new();
     let mut prev_tag = prev_tag.unwrap_or_default();
+
     if prev_tag.is_empty() {
-        prev_tag = git.previous_tag(&tag, is_public)?;
-        log::info!("Found previous tag: {prev_tag}, owner: {owner} repo: {repo} branch: {branch}")
+        match git.previous_tag(&tag, is_public) {
+            Ok(s) => {
+                log::info!(
+                    "Found previous tag: {prev_tag}, owner: {owner} repo: {repo} branch: {branch}"
+                );
+                prev_tag = s;
+            }
+            Err(err) => {
+                log::debug!("Failed to get previous tag {:?}", err);
+            }
+        }
     }
 
-    let mut changelog = String::new();
-
-    if prev_tag.is_empty() {
-        log::info!("No previous tag found for {owner}/{repo}");
-    } else {
+    if !prev_tag.is_empty() {
         let tag_hash = git.tag_hash(&tag, &branch)?;
         let prev_tag_hash = git.tag_hash(&prev_tag, &branch)?;
 

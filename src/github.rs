@@ -1,10 +1,11 @@
-use crate::cmd;
-use crate::git::GitRepo;
 use anyhow::anyhow;
 use async_trait::async_trait;
 use octocrab::models::repos::Tag;
 use octocrab::Octocrab;
 use tracing_log::log;
+
+use crate::cmd;
+use crate::git::GitRepo;
 
 pub fn github_client<'a>() -> &'a Octocrab {
     crate::global::GITHUB_CLIENT.get().unwrap()
@@ -16,6 +17,7 @@ pub trait GithubOperationTrait {
 
     fn merge_pr(&self, id: &str) -> anyhow::Result<()>;
 
+    #[allow(dead_code)]
     async fn get_tag(&self, owner: &str, repo: &str, tag: &str) -> anyhow::Result<Tag>;
 }
 
@@ -44,6 +46,13 @@ impl GithubOperationTrait for GithubCli {
             msg.to_string()
         };
         let fork_branch = format!("pr-{}", tag);
+
+        if String::from_utf8(cmd!("git", &repo_dir_path, &["status", "--porcelain"]).stdout)?
+            .is_empty()
+        {
+            log::info!("No changes in the repo, so no PR is created");
+            return Ok(String::new());
+        }
 
         for args in [
             vec!["checkout", "-b", &fork_branch],

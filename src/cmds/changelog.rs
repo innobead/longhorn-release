@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use chrono::{Duration, NaiveDateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use clap::Args;
 use indoc::formatdoc;
 use octocrab::models::commits::Commit;
@@ -109,7 +109,7 @@ async fn generate_repo_report(
         .parse::<i64>()
         .unwrap();
     let prev_tag_datetime =
-        NaiveDateTime::from_timestamp_opt(prev_tag_timestamp, 0).map(|it| it.and_utc());
+        DateTime::from_timestamp(prev_tag_timestamp, 0);
 
     let today = Utc::now();
     let since_date = if let Some(it) = prev_tag_datetime {

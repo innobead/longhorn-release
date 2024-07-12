@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::fs;
-
 use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
@@ -10,12 +9,11 @@ use maplit::hashmap;
 use regex::Regex;
 use tracing_log::log;
 
+use crate::{Cli, cmd};
 use crate::cmds::CliCommand;
-
 use crate::common::execute;
 use crate::git::{GitCli, GitOperationTrait};
 use crate::github::{GithubCli, GithubOperationTrait};
-use crate::{cmd, Cli};
 
 lazy_static! {
     static ref VERSION_MANIFEST_PATTERNS: HashMap<&'static str, Vec<&'static str>> = hashmap! {
@@ -135,11 +133,16 @@ impl CliCommand for PrArgs {
 
                 gh_client
                     .create_pr(&message, &tag, &branch)
-                    .and_then(|id| {
-                        if merge {
-                            gh_client.merge_pr(id.trim())
-                        } else {
+                    .and_then(|id| match id {
+                        id if id.is_empty() => {
                             Ok(())
+                        }
+                        _ => {
+                            if merge {
+                                gh_client.merge_pr(id.trim())
+                            } else {
+                                Ok(())
+                            }
                         }
                     })?;
                 // });

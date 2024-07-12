@@ -30,7 +30,7 @@ pub struct Cli {
         global = true,
         short,
         long,
-        default_value = "error",
+        default_value = "info",
         value_parser = ["error", "warn", "info", "debug", "trace"],
         help = "Log level"
     )]

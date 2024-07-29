@@ -1,12 +1,13 @@
+use std::{fs, vec};
 use std::collections::HashSet;
 use std::path::PathBuf;
-use std::{fs, vec};
 
 use anyhow::anyhow;
 use async_trait::async_trait;
 use chrono::{Duration, Utc};
 use clap::Args;
 use convert_case::{Case, Casing};
+use glob::glob_with;
 use indexmap::{indexmap, indexset};
 use maplit::hashset;
 use octocrab::models::issues::Issue;
@@ -15,11 +16,11 @@ use octocrab::params::issues::Sort;
 use octocrab::params::State;
 use tracing::log;
 
+use crate::{Cli, cmd};
 use crate::cmds::CliCommand;
 use crate::common::{execute, working_dir_path};
 use crate::git::{GitCli, GitOperationTrait};
 use crate::github::github_client;
-use crate::{cmd, Cli};
 
 #[derive(Args)]
 #[command(about = "Create a GitHub release")]
@@ -78,7 +79,7 @@ pub struct ReleaseArgs {
     #[arg(long, help = "Script to filter searched issues")]
     filter_issue_hook: Option<String>,
 
-    #[arg(long, help = "Files to upload to the release")]
+    #[arg(long, help = "Files to upload to the release (support glob)")]
     artifacts: Option<Vec<String>>,
 
     #[arg(long, help = "Dry run")]
@@ -337,42 +338,86 @@ impl ReleaseArgs {
                 self.repo.to_case(Case::Title),
                 self.tag
             ));
-
             let mut args = vec![
-                "release",
-                "create",
-                &self.tag,
-                "--notes",
-                &note,
-                "--target",
-                &self.branch,
-                "--title",
-                &release_title,
+                "release".to_string(),
+                "create".to_string(),
+                self.tag.clone(),
+                "--notes".to_string(),
+                note.clone(),
+                "--target".to_string(),
+                self.branch.clone(),
+                "--title".to_string(),
+                release_title,
             ];
 
             if self.draft {
-                args.push("--draft");
+                args.push("--draft".to_string());
             }
 
             if self.pre_release {
-                args.push("--prerelease")
+                args.push("--prerelease".to_string())
             }
 
-            let art_paths: Vec<PathBuf> = self
-                .artifacts
-                .clone()
-                .unwrap_or_default()
-                .iter()
-                .map(|it| PathBuf::from(it))
-                .map(|it| it.canonicalize().unwrap())
-                .collect();
-
-            let mut arts = art_paths.iter().map(|it| it.to_str().unwrap()).collect();
-            args.append(&mut arts);
+            update_gh_args_from_artifacts(&mut args, self.artifacts.as_ref().unwrap_or(&vec![]));
 
             cmd!("gh", &repo_dir_path, &args);
         }
 
         Ok(note)
+    }
+}
+
+fn update_gh_args_from_artifacts(args: &mut Vec<String>, artifacts: &Vec<String>) {
+    for artifact in artifacts {
+        glob_with(artifact, glob::MatchOptions::new())
+            .unwrap()
+            .filter_map(Result::ok)
+            .flat_map(|it| it.canonicalize())
+            .for_each(|path| {
+                args.push(path.to_string_lossy().to_string());
+            });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs::File;
+
+    use filepath::FilePath;
+    use tempfile::tempdir;
+
+    use super::*;
+
+    #[test]
+    fn test_update_gh_args_from_artifacts() -> anyhow::Result<()> {
+        let dir = tempdir()?;
+
+        let mut files = vec![];
+        for file in vec!["dummy.sbom", "dummy2.sbom"] {
+            files.push(
+                File::create(dir.path().join(file))?
+                    .path()?
+                    .canonicalize()?
+                    .to_string_lossy()
+                    .to_string(),
+            );
+        }
+
+        for file in &files {
+            let _ = File::create(dir.path().join(file))?;
+        }
+
+        let mut args = vec!["pre-dummy.sbom".to_string()];
+        let artifact_globs = vec![format!(
+            "{}/*",
+            dir.path().canonicalize()?.to_string_lossy().to_string()
+        )];
+
+        update_gh_args_from_artifacts(&mut args, &artifact_globs);
+
+        assert_eq!(args.len() - 1, files.len());
+        assert_eq!(args[1..], files);
+
+        Ok(())
     }
 }

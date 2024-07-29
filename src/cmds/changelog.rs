@@ -5,10 +5,10 @@ use indoc::formatdoc;
 use octocrab::models::commits::Commit;
 use tracing_log::log;
 
-use crate::{Cli, cmd};
 use crate::cmds::CliCommand;
 use crate::git::{GitCli, GitOperationTrait};
 use crate::github::github_client;
+use crate::{cmd, Cli};
 
 #[derive(Args)]
 #[command(about = "Create a Changelog for repos between tags")]

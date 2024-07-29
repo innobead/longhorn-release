@@ -30,6 +30,10 @@ serde = { version = "1.0.193", features = ["derive"] }
 semver = { version = "1.0.20", features = [] }
 is_executable = { version = "1.0.1" }
 chrono = { version = "0.4.31", features = [] }
+glob = { version = "0.3.1" }
+
+[dev-dependencies]
+assertables = { version = "7.0.1" }
 
 [profile.release]
 strip = true

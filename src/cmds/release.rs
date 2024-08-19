@@ -1,6 +1,6 @@
-use std::{fs, vec};
 use std::collections::HashSet;
 use std::path::PathBuf;
+use std::{fs, vec};
 
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -16,11 +16,11 @@ use octocrab::params::issues::Sort;
 use octocrab::params::State;
 use tracing::log;
 
-use crate::{Cli, cmd};
 use crate::cmds::CliCommand;
 use crate::common::{execute, working_dir_path};
 use crate::git::{GitCli, GitOperationTrait};
 use crate::github::github_client;
+use crate::{cmd, Cli};
 
 #[derive(Args)]
 #[command(about = "Create a GitHub release")]

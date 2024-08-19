@@ -64,12 +64,8 @@ pub struct PrArgs {
     #[arg(long, hide = true, help = "Longhorn chart repo")]
     longhorn_chart_repo: Option<String>,
 
-    #[arg(
-        long,
-        hide = true,
-        requires = "longhorn_chart_repo",
-        help = "Longhorn repos used to update in the PR"
-    )]
+    /// Longhorn repos used to update in the PR (e.g. longhorn-manager, cli:longhorn-cli)
+    #[arg(long, hide = true, requires = "longhorn_chart_repo")]
     longhorn_repos: Option<Vec<String>>,
 }
 
@@ -91,9 +87,8 @@ impl CliCommand for PrArgs {
         )?;
 
         if self.longhorn_repos.is_some() {
-            let longhorn_repos = self.longhorn_repos.as_ref().unwrap();
-
-            update_version_manifests(repo_dir_path, &self.tag, longhorn_repos)?;
+            let components = get_container_component_names(self.longhorn_repos.as_ref().unwrap());
+            update_version_manifests(repo_dir_path, &self.tag, &components)?;
         }
 
         if self.longhorn_chart_repo.is_some() {
@@ -153,6 +148,20 @@ impl CliCommand for PrArgs {
 
         Ok(())
     }
+}
+
+fn get_container_component_names(repos: &Vec<String>) -> Vec<String> {
+    let mut components = vec![];
+
+    for repo in repos {
+        if let Some((_repo, component)) = repo.split_once(":") {
+            components.push(component.to_string());
+        } else {
+            components.push(repo.clone());
+        }
+    }
+
+    components
 }
 
 fn update_version_manifests(
@@ -271,6 +280,26 @@ mod tests {
 
             assert!(result.is_ok());
             assert_eq!(str, d["expected"]);
+        }
+    }
+
+    #[test]
+    fn test_get_container_component_names() {
+        let data = vec![
+            hashmap! {
+                "repos" => vec!["longhorn-manager".to_string()],
+                "expected" => vec!["longhorn-manager".to_string()],
+            },
+            hashmap! {
+                "repos" => vec!["cli:longhorn-cli".to_string()],
+                "expected" => vec!["longhorn-cli".to_string()],
+            },
+        ];
+
+        for d in data {
+            let result = get_container_component_names(&d["repos"]);
+
+            assert_eq!(result, d["expected"]);
         }
     }
 }

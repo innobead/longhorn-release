@@ -403,13 +403,9 @@ mod tests {
             );
         }
 
-        for file in &files {
-            let _ = File::create(dir.path().join(file))?;
-        }
-
-        let mut args = vec!["pre-dummy.sbom".to_string()];
+        let mut args = vec!["non-existing.sbom".to_string()];
         let artifact_globs = vec![format!(
-            "{}/*",
+            "{}/*.sbom",
             dir.path().canonicalize()?.to_string_lossy().to_string()
         )];
 

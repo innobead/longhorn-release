@@ -62,6 +62,9 @@ pub struct ReleaseArgs {
     )]
     note_section_labels: Option<Vec<String>>,
 
+    #[arg(long, help = "Disable release section")]
+    note_section_disable: bool,
+
     #[arg(
         short = 'c',
         long,
@@ -137,7 +140,13 @@ impl CliCommand for ReleaseArgs {
             String::new()
         };
 
-        let note = self.create_release(&mut issue_ids, &issues, &pre_note, &post_note)?;
+        let note = self.create_release(
+            &mut issue_ids,
+            &issues,
+            &pre_note,
+            &post_note,
+            self.note_section_disable,
+        )?;
 
         println!("{}", note);
 
@@ -246,6 +255,7 @@ impl ReleaseArgs {
         issues: &Vec<Issue>,
         pre_note: &String,
         post_note: &String,
+        note_section_disable: bool,
     ) -> anyhow::Result<String> {
         log::info!("Creating a release for {}", self.tag);
 
@@ -293,6 +303,10 @@ impl ReleaseArgs {
             }
 
             sections.get_mut(&section_key).unwrap().push(issue);
+        }
+
+        if note_section_disable {
+            sections.swap_remove("misc");
         }
 
         for (title, issues) in &sections {
